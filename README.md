@@ -36,13 +36,13 @@ Server = <not yet published — see Status>
 
 ## Status, honestly
 
-**The pipeline exists; nothing is published yet.** `publish.sh` +
-the `publish` workflow (manual dispatch) pull `.pkg.tar.zst` assets
-from tagged releases of `lisa-desktop`/`lisa-apps`/`lisa-os`, run
-`repo-add`, and publish the index to this repo's rolling `current`
-release. No source repo has cut a package tag yet, so the `current`
-release does not exist and there is no `Server=` line to give you (no
-invented URLs — CLAUDE.md rule 8). When it goes live it will be:
+**The index is live** (first published 2026-08-03, carrying
+`lisa-desktop`, `lisa-desktop-ime` and `lisa-apps` 0.1.0-1; verified
+by a clean container that knew nothing but the `Server=` line below).
+`publish.sh` + the `publish` workflow (manual dispatch) pull
+`.pkg.tar.zst` assets from tagged releases of
+`lisa-desktop`/`lisa-apps`/`lisa-os`, run `repo-add`, and publish the
+index to this repo's rolling `current` release:
 
 ```ini
 [lisa]
@@ -52,8 +52,10 @@ Server = https://github.com/Lisa-AgenticOS/lisa-packages/releases/download/curre
 
 `SigLevel = Optional` is a stated gap, not a decision that signing is
 unnecessary: signing needs a key-custody decision from the project
-owner, tracked in lisa-os#171. Until then the image build continues to
-consume the locally built `file:///…` repo, unchanged.
+owner, tracked in lisa-os#171. The image build also still consumes the
+locally built `file:///…` repo — switching it to this index is #171
+step 4, deliberately separate so the old path keeps working until the
+new one has shipped a release.
 
 ## How to extend it
 
