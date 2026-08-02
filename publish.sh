@@ -33,8 +33,11 @@ cp "$dir"/*.pkg.tar.zst "$work/"
 
 # --new: keep only the newest version of each package in the db.
 repo-add --new "$work/lisa.db.tar.gz" "$work"/*.pkg.tar.zst
-# pacman fetches "lisa.db" (a symlink locally); release assets cannot
-# be symlinks, so upload the file under both names.
+# repo-add already leaves "lisa.db"/"lisa.files" as SYMLINKS to the
+# tarballs; release assets cannot be symlinks, so replace them with
+# real copies. (A plain cp follows the link and dies on "same file" —
+# that failed the first publish run.)
+rm "$work/lisa.db" "$work/lisa.files"
 cp "$work/lisa.db.tar.gz" "$work/lisa.db"
 cp "$work/lisa.files.tar.gz" "$work/lisa.files"
 
