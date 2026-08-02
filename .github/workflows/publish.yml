@@ -1,0 +1,54 @@
+# Publish the [lisa] index (lisa-os#171 step 3). Manually dispatched
+# with a list of source releases to pull packages from — deliberate,
+# not automatic: publishing to the index every consumer trusts should
+# be an act, not a side effect of tagging.
+name: publish
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: >-
+          Space-separated repo=tag pairs to pull .pkg.tar.zst assets
+          from, e.g. "lisa-desktop=v0.1.0 lisa-apps=v0.1.0"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: archlinux:latest
+    permissions:
+      contents: write
+    steps:
+      - name: Install tools
+        # repo-add ships in pacman itself; no extra package needed.
+        run: pacman -Syu --noconfirm --needed git github-cli
+      - uses: actions/checkout@v5
+      - name: Fetch packages from source releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Via env, never interpolated into the script: a dispatch
+          # input is text, and text with a $(...) in it must stay text.
+          SOURCES: ${{ inputs.sources }}
+        run: |
+          mkdir -p pkgs
+          for pair in $SOURCES; do
+            case "$pair" in
+              *=*) ;;
+              *) echo "bad source '$pair' (want repo=tag)"; exit 1 ;;
+            esac
+            repo="${pair%%=*}"; tag="${pair##*=}"
+            echo ">> $repo @ $tag"
+            gh release download "$tag" \
+              --repo "Lisa-AgenticOS/$repo" \
+              --pattern '*.pkg.tar.zst' --dir pkgs
+          done
+          ls -l pkgs/
+      - name: Publish the index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global safe.directory "$PWD"
+          bash publish.sh pkgs

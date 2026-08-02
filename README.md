@@ -36,12 +36,24 @@ Server = <not yet published — see Status>
 
 ## Status, honestly
 
-**Nothing is hosted yet.** Today the `[lisa]` repo is built locally by
-`os/repo-tools/build-packages.sh` in `lisa-os` and consumed as
-`Server = file:///…` during image builds. This repo exists so that
-stops being one developer's `out/` directory; the publishing pipeline
-is the next deliverable, and this README will carry the real `Server=`
-line only when it exists (no invented URLs — CLAUDE.md rule 8).
+**The pipeline exists; nothing is published yet.** `publish.sh` +
+the `publish` workflow (manual dispatch) pull `.pkg.tar.zst` assets
+from tagged releases of `lisa-desktop`/`lisa-apps`/`lisa-os`, run
+`repo-add`, and publish the index to this repo's rolling `current`
+release. No source repo has cut a package tag yet, so the `current`
+release does not exist and there is no `Server=` line to give you (no
+invented URLs — CLAUDE.md rule 8). When it goes live it will be:
+
+```ini
+[lisa]
+SigLevel = Optional TrustAll
+Server = https://github.com/Lisa-AgenticOS/lisa-packages/releases/download/current
+```
+
+`SigLevel = Optional` is a stated gap, not a decision that signing is
+unnecessary: signing needs a key-custody decision from the project
+owner, tracked in lisa-os#171. Until then the image build continues to
+consume the locally built `file:///…` repo, unchanged.
 
 ## How to extend it
 
