@@ -50,12 +50,24 @@ SigLevel = Optional TrustAll
 Server = https://github.com/Lisa-AgenticOS/lisa-packages/releases/download/current
 ```
 
-`SigLevel = Optional` is a stated gap, not a decision that signing is
-unnecessary: signing needs a key-custody decision from the project
-owner, tracked in lisa-os#171. The image build also still consumes the
-locally built `file:///…` repo — switching it to this index is #171
-step 4, deliberately separate so the old path keeps working until the
-new one has shipped a release.
+**Signing** (decided 2026-08-03): packages and the db are signed by a
+dedicated key — *Lisa OS Package Signing*, fingerprint
+`737240D11D28E109A474A8E5827E27417AF5982B`, public half committed here
+as `lisa-packages.gpg.asc`. Custody: the private key lives in this
+repo's `LISA_SIGNING_KEY` Actions secret (so publishing stays
+automatic) with the master copy in the owner's password manager
+(GitHub secrets cannot be read back). This defends tampered downloads
+and future mirrors; it deliberately does **not** defend a compromise
+of the GitHub org itself — offline owner-held signing would, at the
+cost of a manual step per publish, and rotating to it later breaks no
+device because the public key reaches consumers through the normal
+update path.
+
+`SigLevel` stays `Optional` until the public key ships **in the
+image** (a lisa-keyring package — then it flips to `Required`). The
+image build also still consumes the locally built `file:///…` repo —
+switching it to this index is #171 step 4, deliberately separate so
+the old path keeps working until the new one has shipped a release.
 
 ## How to extend it
 

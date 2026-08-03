@@ -49,6 +49,11 @@ jobs:
       - name: Publish the index
         env:
           GH_TOKEN: ${{ github.token }}
+          # The dedicated package-signing key (custody: this repo's
+          # Actions secret + the owner's password manager; fingerprint
+          # 737240D11D28E109A474A8E5827E27417AF5982B). Absent, the
+          # publish is unsigned — publish.sh says which it did.
+          LISA_SIGNING_KEY: ${{ secrets.LISA_SIGNING_KEY }}
         run: |
           git config --global safe.directory "$PWD"
           bash publish.sh pkgs

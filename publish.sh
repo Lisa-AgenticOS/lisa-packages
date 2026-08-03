@@ -31,8 +31,26 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cp "$dir"/*.pkg.tar.zst "$work/"
 
+# Sign when the key is present (CI provides it via the
+# LISA_SIGNING_KEY secret; a local run without it publishes unsigned,
+# same as before — SigLevel on consumers is still Optional until the
+# public key ships in the image). Key: "Lisa OS Package Signing",
+# fingerprint 737240D11D28E109A474A8E5827E27417AF5982B; the public
+# half is committed here as lisa-packages.gpg.asc.
+sign_args=()
+if [ -n "${LISA_SIGNING_KEY:-}" ]; then
+    export GNUPGHOME="$work/gnupg"
+    mkdir -p "$GNUPGHOME" && chmod 700 "$GNUPGHOME"
+    printf '%s' "$LISA_SIGNING_KEY" | gpg --batch --quiet --import
+    for p in "$work"/*.pkg.tar.zst; do
+        gpg --batch --detach-sign --no-armor "$p"
+    done
+    sign_args=(--sign)
+    echo ">> packages and db will be signed"
+fi
+
 # --new: keep only the newest version of each package in the db.
-repo-add --new "$work/lisa.db.tar.gz" "$work"/*.pkg.tar.zst
+repo-add --new "${sign_args[@]}" "$work/lisa.db.tar.gz" "$work"/*.pkg.tar.zst
 # repo-add already leaves "lisa.db"/"lisa.files" as SYMLINKS to the
 # tarballs; release assets cannot be symlinks, so replace them with
 # real copies. (A plain cp follows the link and dies on "same file" —
@@ -40,6 +58,10 @@ repo-add --new "$work/lisa.db.tar.gz" "$work"/*.pkg.tar.zst
 rm "$work/lisa.db" "$work/lisa.files"
 cp "$work/lisa.db.tar.gz" "$work/lisa.db"
 cp "$work/lisa.files.tar.gz" "$work/lisa.files"
+# pacman fetches the db signature under the short name too.
+if [ -e "$work/lisa.db.tar.gz.sig" ]; then
+    cp "$work/lisa.db.tar.gz.sig" "$work/lisa.db.sig"
+fi
 
 if ! gh release view "$tag" >/dev/null 2>&1; then
     gh release create "$tag" --title "[lisa] package index" \
@@ -48,9 +70,12 @@ fi
 # --clobber: same-name assets are replaced, so the index is atomic per
 # file; pacman re-fetches the db before any package, so a client sees
 # either the old index or the new one, never a torn mix.
+# nullglob: *.sig simply contributes nothing on an unsigned run.
+shopt -s nullglob
 gh release upload "$tag" --clobber \
     "$work/lisa.db" "$work/lisa.db.tar.gz" \
     "$work/lisa.files" "$work/lisa.files.tar.gz" \
-    "$work"/*.pkg.tar.zst
+    "$work"/*.pkg.tar.zst "$work"/*.sig
+shopt -u nullglob
 
 echo ">> published $(ls "$work"/*.pkg.tar.zst | wc -l) packages to the '$tag' release"
