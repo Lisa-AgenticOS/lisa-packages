@@ -58,10 +58,16 @@ repo-add --new "${sign_args[@]}" "$work/lisa.db.tar.gz" "$work"/*.pkg.tar.zst
 rm "$work/lisa.db" "$work/lisa.files"
 cp "$work/lisa.db.tar.gz" "$work/lisa.db"
 cp "$work/lisa.files.tar.gz" "$work/lisa.files"
-# pacman fetches the db signature under the short name too.
-if [ -e "$work/lisa.db.tar.gz.sig" ]; then
-    cp "$work/lisa.db.tar.gz.sig" "$work/lisa.db.sig"
-fi
+# The signatures get the same symlink treatment as the dbs:
+# repo-add --sign already leaves lisa.db.sig and lisa.files.sig as
+# symlinks to the .tar.gz.sig files — remove, then copy real files
+# (the bare cp died on "same file", exactly like the dbs did).
+for name in lisa.db lisa.files; do
+    if [ -e "$work/$name.tar.gz.sig" ]; then
+        rm -f "$work/$name.sig"
+        cp "$work/$name.tar.gz.sig" "$work/$name.sig"
+    fi
+done
 
 if ! gh release view "$tag" >/dev/null 2>&1; then
     gh release create "$tag" --title "[lisa] package index" \
