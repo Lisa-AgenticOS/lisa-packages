@@ -9,9 +9,26 @@ on:
       sources:
         description: >-
           Space-separated repo=tag pairs to pull .pkg.tar.zst assets
-          from, e.g. "lisa-desktop=v0.1.0 lisa-apps=v0.1.0"
+          from, e.g. "lisa-os=v20260805.78 lisa-desktop=v0.2.0
+          lisa-apps=v0.1.0". The db is REBUILT FROM SCRATCH out of only
+          these — every dispatch must list every source repo, or the
+          omitted repo's packages vanish from the index.
         required: true
         type: string
+      allow_partial:
+        description: >-
+          Publish even though sources omit one of the three standard
+          repos. Only when shrinking the index is the intent.
+        required: false
+        type: boolean
+        default: false
+      allow_unsigned:
+        description: >-
+          Publish unsigned if LISA_SIGNING_KEY is unavailable. Only for
+          deliberate unsigned publishes; a missing secret should fail.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   publish:
@@ -32,7 +49,30 @@ jobs:
           # Via env, never interpolated into the script: a dispatch
           # input is text, and text with a $(...) in it must stay text.
           SOURCES: ${{ inputs.sources }}
+          ALLOW_PARTIAL: ${{ inputs.allow_partial }}
         run: |
+          # publish.sh rebuilds the db from ONLY what this dispatch
+          # fetches (no merge with the published index). Omitting a
+          # repo therefore REMOVES its packages from the db while their
+          # .zst assets stay visible on the release — a silent shrink
+          # of every image build's package source. Until now this was
+          # guarded by operator memory alone.
+          if [ "$ALLOW_PARTIAL" != "true" ]; then
+            missing=""
+            for need in lisa-os lisa-desktop lisa-apps; do
+              case " $SOURCES " in
+                *" $need="*) ;;
+                *) missing="$missing $need" ;;
+              esac
+            done
+            if [ -n "$missing" ]; then
+              echo "FAIL: sources omit:$missing"
+              echo "The index is rebuilt from scratch per dispatch — an omitted"
+              echo "repo's packages vanish from the db. List every repo, or pass"
+              echo "allow_partial: true if shrinking the index is the intent."
+              exit 1
+            fi
+          fi
           mkdir -p pkgs
           for pair in $SOURCES; do
             case "$pair" in
@@ -52,8 +92,11 @@ jobs:
           # The dedicated package-signing key (custody: this repo's
           # Actions secret + the owner's password manager; fingerprint
           # 737240D11D28E109A474A8E5827E27417AF5982B). Absent, the
-          # publish is unsigned — publish.sh says which it did.
+          # publish now FAILS unless allow_unsigned was passed — a
+          # deleted or renamed secret must be a red run, not a quiet
+          # downgrade to an unsigned index.
           LISA_SIGNING_KEY: ${{ secrets.LISA_SIGNING_KEY }}
+          LISA_ALLOW_UNSIGNED: ${{ inputs.allow_unsigned == true && '1' || '' }}
         run: |
           git config --global safe.directory "$PWD"
           bash publish.sh pkgs
